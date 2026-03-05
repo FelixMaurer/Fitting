@@ -102,3 +102,127 @@ st.write("""
 
 Sometimes, if it steps too far, it **overshoots** the lowest point and has to swing back. As it takes smaller and smaller steps, settling at the exact bottom where the total error is at its absolute minimum, we say the algorithm has **converged**. Finding this minimum is the mathematical goal of every standard fitting process.
 """)
+# --- SECTION 2: THE TWO MINIMUM PROBLEM ---
+st.markdown("---")
+st.header("2. The 'Two Minimum' Problem")
+
+st.write("When we fit more than one parameter, the 'valley' of errors becomes a 3D landscape. "
+         "Depending on where your algorithm starts, it might roll into the wrong valley. "
+         "Try adjusting the starting values below and run the fit to see if you get trapped!")
+
+# User Inputs for Starting Values
+col1, col2 = st.columns(2)
+with col1:
+    user_p1 = st.slider("Start position for Narrow Peak (p1)", 1.0, 9.0, 7.5, step=0.5)
+with col2:
+    user_p2 = st.slider("Start position for Wide Peak (p2)", 1.0, 9.0, 2.0, step=0.5)
+
+if st.button("Run 2D Fit Animation"):
+    plot_placeholder_2 = st.empty()
+    
+    # 1. Setup Synthetic Data
+    x = np.linspace(0, 10, 200)
+    y_data = 1.0 * np.exp(-((x - 3) / 0.4)**2) + 0.8 * np.exp(-((x - 7) / 1.5)**2)
+    
+    # 2. Define Model and Error Function
+    def model_func(p):
+        return 1.0 * np.exp(-((x - p[0]) / 0.4)**2) + 0.8 * np.exp(-((x - p[1]) / 1.5)**2)
+        
+    def sse_func(p):
+        return np.sum((y_data - model_func(p))**2)
+        
+    # 3. Pre-calculate Surface for Landscape
+    mu_range = np.linspace(1, 9, 40)
+    M1, M2 = np.meshgrid(mu_range, mu_range)
+    Z = np.zeros_like(M1)
+    for i in range(M1.shape[0]):
+        for j in range(M1.shape[1]):
+            Z[i, j] = np.log10(sse_func([M1[i, j], M2[i, j]]))
+            
+    # 4. Optimization Parameters
+    lr = 0.002
+    n_steps = 80
+    eps = 1e-4
+    
+    curr_user = np.array([user_p1, user_p2])
+    curr_good = np.array([2.0, 8.0]) # The known good starting point
+    
+    path_user = [curr_user.copy()]
+    path_good = [curr_good.copy()]
+    
+    # 5. Animation Loop
+    for t in range(n_steps):
+        # Calculate gradients (Numeric derivative)
+        v_user = sse_func(curr_user)
+        g_user = np.array([
+            (sse_func(curr_user + [eps, 0]) - v_user) / eps,
+            (sse_func(curr_user + [0, eps]) - v_user) / eps
+        ])
+        curr_user = curr_user - lr * g_user
+        path_user.append(curr_user.copy())
+        
+        v_good = sse_func(curr_good)
+        g_good = np.array([
+            (sse_func(curr_good + [eps, 0]) - v_good) / eps,
+            (sse_func(curr_good + [0, eps]) - v_good) / eps
+        ])
+        curr_good = curr_good - lr * g_good
+        path_good.append(curr_good.copy())
+        
+        # Draw every 3rd frame to speed up web rendering
+        if t % 3 == 0 or t == n_steps - 1:
+            fig = plt.figure(figsize=(14, 6))
+            
+            # LEFT: The Model Fit
+            ax1 = fig.add_subplot(121)
+            ax1.plot(x, y_data, 'k.', markersize=8, label='Experimental Data')
+            ax1.plot(x, model_func(curr_user), 'r-', linewidth=2.5, label='User Path Fit (Red)')
+            ax1.plot(x, model_func(curr_good), 'g-', linewidth=2.5, alpha=0.6, label='Global Path Fit (Green)')
+            ax1.set_title('Current Fit to Data')
+            ax1.set_ylim(-0.2, 1.5)
+            ax1.legend(loc='upper right')
+            
+            # RIGHT: The Parameter Space (3D)
+            ax2 = fig.add_subplot(122, projection='3d')
+            ax2.plot_surface(M1, M2, Z, cmap='viridis', alpha=0.6, edgecolor='none')
+            
+            # Plot the paths
+            p_user_arr = np.array(path_user)
+            p_good_arr = np.array(path_good)
+            
+            z_user = [np.log10(sse_func(p)) for p in p_user_arr]
+            z_good = [np.log10(sse_func(p)) for p in p_good_arr]
+            
+            ax2.plot(p_user_arr[:,0], p_user_arr[:,1], z_user, 'r.-', linewidth=2)
+            ax2.plot(p_good_arr[:,0], p_good_arr[:,1], z_good, 'g.-', linewidth=2)
+            
+            # Plot current position markers
+            ax2.scatter(*curr_user, np.log10(sse_func(curr_user)), color='red', s=100)
+            ax2.scatter(*curr_good, np.log10(sse_func(curr_good)), color='green', s=100)
+            
+            ax2.set_title('Optimizer Path on Error Surface')
+            ax2.set_xlabel('Narrow Peak Pos')
+            ax2.set_ylabel('Wide Peak Pos')
+            ax2.set_zlabel('log10(SSE)')
+            ax2.view_init(elev=30, azim=45)
+            
+            plot_placeholder_2.pyplot(fig)
+            plt.close(fig)
+            time.sleep(0.01)
+
+# --- EXPLANATION OF THE TWO MINIMUM PROBLEM ---
+st.markdown("### Understanding Local vs. Global Minima")
+st.write("""
+In the animation above, you are watching two separate fits happening at the same time. 
+* The **Green Path** starts in a lucky spot and rolls smoothly down into the deepest part of the valley. This is the **Global Minimum**, where the theoretical model perfectly matches the experimental data.
+* The **Red Path** (which you control) might get stuck in a shallower crater along the way. Because fitting algorithms are "blind" and only feel the slope directly under their feet, once they hit the bottom of *any* valley, they think they are done. This trap is called a **Local Minimum**.
+""")
+
+
+
+st.markdown("### Why We Simplify Parameters")
+st.write("""
+When fitting complex physical systems, letting every parameter float freely creates incredibly rugged error landscapes filled with these local minimum traps. 
+
+This is exactly why it is often more robust to optimize for the **ratio** between parameters (such as $M_0/M_2$) rather than treating them as separate, independent variables. By locking in a ratio and ensuring that only a single physical driver—like the repulsion force—is allowed to change, you effectively slice through this chaotic 3D landscape. You collapse a tricky, crater-filled map into a simpler, smoother curve, forcing the algorithm to bypass the traps and land exactly on the true global minimum.
+""")
