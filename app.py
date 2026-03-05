@@ -83,4 +83,22 @@ if st.button("Run Fit Animation"):
         # Render and close
         plot_placeholder.pyplot(fig)
         plt.close(fig) 
-        time.sleep(0.08)
+        time.sleep(0.03)
+# --- EXPLANATION OF THE ANIMATION ---
+st.markdown("### What is happening here?")
+
+st.write("""
+**The Left Plot: The Residues** On the left, you see our data points (blue dots) and our model (the red line). The faint vertical lines connecting the dots to the red line are called **residues** (or residuals). A residue is simply the "mistake" the model makes for a specific data point—it is the vertical distance between the actual observed data and the theoretical line.
+
+**The Right Plot: The Valley of Errors** If we take all those individual residues, square them (so negative and positive mistakes don't cancel each other out), and add them up, we get a single number representing the "Total Error." 
+
+If you calculate this Total Error for every possible slope of the line, it forms a shape like a bowl or a valley, as seen in the right plot. 
+""")
+
+
+
+st.write("""
+**The Algorithm and Converging** A fitting algorithm is essentially a blind explorer trying to find the lowest point in that valley. It starts with a guess (the red ball dropping in), checks the slope of the valley, and takes a step downwards. 
+
+Sometimes, if it steps too far, it **overshoots** the lowest point and has to swing back. As it takes smaller and smaller steps, settling at the exact bottom where the total error is at its absolute minimum, we say the algorithm has **converged**. Finding this minimum is the mathematical goal of every standard fitting process.
+""")
