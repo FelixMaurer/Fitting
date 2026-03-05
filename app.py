@@ -489,9 +489,91 @@ if st.button("Run Trapped Fit"):
 
 st.markdown("### Why this is a Bad Fit")
 st.write("""
-Look closely at the bottom panel showing the weighted residues. 
+At first glance, the numerical results might trick you. The algorithm reports very small mathematical errors for the parameters, which could lead you to believe the fit is highly accurate. 
 
-In a good fit, these dots should look like static noise on an old television. They should scatter randomly around the zero line. 
-
-However, in the plot above, the residues form massive waves and obvious structures. They shoot far beyond the acceptable boundaries. This systematic deviation is the absolute clearest sign that the algorithm found a local crater rather than the true global minimum. It tells us that the mathematical model currently displayed does not reflect the actual physics of the measured data.
+However, look closely at the bottom panel showing the weighted residuals. If you observe the residual progression, you will notice a clear oscillation in the beginning. Instead of scattering like pure random noise, the dots form a distinct wavy pattern. 
 """)
+
+
+
+st.write("""
+This oscillation is a clear systematic deviation. It proves that the mismatch has much more structure than just random statistical noise. Even though the standard errors are tiny, this structural deviation is the ultimate visual proof that the algorithm is trapped in a false minimum and the current model does not reflect the actual physics.
+""")
+
+# --- SECTION 5: THE AUTOCORRELATION FUNCTION ---
+st.divider()
+st.header("5. The Autocorrelation Function")
+
+st.write("""
+Visual inspection is a great start, but we need a strict mathematical tool to prove whether our residues are purely random noise or if they hide an unresolved systematic error. 
+
+This is exactly what the Autocorrelation Function does. It takes the residual signal and compares it with a shifted version of itself. 
+
+* **Random Noise:** If the fit is perfect, the errors are purely statistical. Knowing that one data point is too high tells you absolutely nothing about the next data point. The autocorrelation should immediately drop to zero and stay within the statistical confidence limits.
+* **Structured Error:** If the fit is trapped in a false minimum, the residues form a wave. A high point is naturally followed by another high point. The autocorrelation function detects this memory in the data and will clearly spike outside the confidence boundaries.
+""")
+
+
+
+if st.button("Calculate Autocorrelation for Both Fits"):
+    # We quickly recalculate both fits under the hood to guarantee we have the residuals
+    true_sigma = np.sqrt(np.maximum(y_data, 1))
+    
+    # 1. The Good Fit
+    good_guess = [25000.0, 13.0, 0.3, 2000.0, 1.0, 2.0, 500.0, 2.0]
+    popt_good, _ = curve_fit(pals_fit_func, x_data, y_data, p0=good_guess, sigma=true_sigma, absolute_sigma=True, method='trf', bounds=([0, 0, 0.01, 0, 0.01, 0, 0, 0.01], [np.inf, 50.0, 5.0, np.inf, 10.0, np.inf, np.inf, 50.0]), max_nfev=10000)
+    res_good = (y_data - pals_fit_func(x_data, *popt_good)) / true_sigma
+    
+    # 2. The Bad Fit (Trapped)
+    bad_guess = [25000.0, 13.0, 0.25, 2000.0, 1.5, 2.0, 1.0, 0.01]
+    popt_bad, _ = curve_fit(pals_fit_func, x_data, y_data, p0=bad_guess, sigma=true_sigma, absolute_sigma=True, method='lm', maxfev=10000)
+    res_bad = (y_data - pals_fit_func(x_data, *popt_bad)) / true_sigma
+
+    # Function to calculate ACF
+    def calc_acf(res, max_lags=100):
+        n = len(res)
+        res_mean = np.mean(res)
+        res_centered = res - res_mean
+        sum_sq = np.sum(res_centered**2)
+        acf = np.zeros(max_lags + 1)
+        for k in range(max_lags + 1):
+            if k == 0:
+                acf[k] = 1.0
+            else:
+                acf[k] = np.sum(res_centered[:-k] * res_centered[k:]) / sum_sq
+        conf_limit = 1.96 / np.sqrt(n)
+        return acf, conf_limit
+
+    acf_good, conf_good = calc_acf(res_good)
+    acf_bad, conf_bad = calc_acf(res_bad)
+    lags = np.arange(101)
+
+    # Plotting both ACFs side by side
+    fig_acf, (ax_acf1, ax_acf2) = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Good Fit ACF Plot
+    ax_acf1.stem(lags, acf_good, linefmt='k-', markerfmt='k.', basefmt='k-')
+    ax_acf1.axhline(conf_good, color='red', linestyle=':')
+    ax_acf1.axhline(-conf_good, color='red', linestyle=':')
+    ax_acf1.set_title("Autocorrelation: Global Minimum")
+    ax_acf1.set_xlabel("Lag (Bins)")
+    ax_acf1.set_ylabel("Autocorrelation")
+    ax_acf1.set_ylim(-0.5, 1)
+    
+    # Bad Fit ACF Plot
+    ax_acf2.stem(lags, acf_bad, linefmt='k-', markerfmt='k.', basefmt='k-')
+    ax_acf2.axhline(conf_bad, color='red', linestyle=':')
+    ax_acf2.axhline(-conf_bad, color='red', linestyle=':')
+    ax_acf2.set_title("Autocorrelation: Trapped in False Minimum")
+    ax_acf2.set_xlabel("Lag (Bins)")
+    ax_acf2.set_ylim(-0.5, 1)
+    
+    st.pyplot(fig_acf)
+
+    st.write("""
+    Observe the difference between the two plots above. 
+    
+    The plot on the left represents our successful global minimum fit. Almost immediately after the first bin, the correlation drops to zero and stays securely within the red dotted boundaries. This confirms the remaining errors are just natural counting statistics.
+    
+    The plot on the right represents the trapped fit. The strong wave pattern violently breaches the confidence limits for dozens of bins. The math proves what our eyes suspected: the model is fundamentally incorrect.
+    """)
