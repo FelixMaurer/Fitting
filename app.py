@@ -663,17 +663,15 @@ if st.button("Run MELT Estimation"):
     # --- FIGURE 1: THE MELT SPECTRUM ---
     fig_melt, ax_melt = plt.subplots(figsize=(10, 5))
     
-    # We clip the lower bound of alpha slightly above zero to safely use log scale on the Y axis
-    safe_alpha_dist = np.maximum(alpha_dist, 1e-8)
-    ax_melt.semilogx(tau_grid, safe_alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
+    # We use semilogx for a logarithmic time axis but a linear amplitude axis
+    ax_melt.semilogx(tau_grid, alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
     
     for p_tau, p_amp in zip(peak_taus, peak_amps_display):
-        safe_p_amp = max(p_amp, 1e-8)
-        ax_melt.semilogx(p_tau, safe_p_amp, 'ro', markersize=8)
-        ax_melt.text(p_tau, safe_p_amp * 1.5, f"{p_tau:.3f} ns", ha='center', fontweight='bold', color='red')
+        ax_melt.semilogx(p_tau, p_amp, 'ro', markersize=8)
+        ax_melt.text(p_tau, p_amp * 1.1, f"{p_tau:.3f} ns", ha='center', fontweight='bold', color='red')
         
     ax_melt.set_xlabel("Lifetime tau (ns)")
-    ax_melt.set_ylabel("Amplitude alpha (log scale)")
+    ax_melt.set_ylabel("Amplitude alpha")
     ax_melt.set_title("Continuous Lifetime Spectrum (MELT)")
     ax_melt.grid(True, which="both", linestyle=":", alpha=0.5)
     ax_melt.legend()
@@ -704,7 +702,7 @@ if st.button("Run MELT Estimation"):
     st.pyplot(fig_pred)
 
     st.write("""
-    The top plot shows the continuous probability spectrum mapped onto a logarithmic grid. The distinct peaks represent the most mathematically probable lifetimes residing within the sample. 
+    The top plot shows the continuous probability spectrum mapped across a logarithmic time axis. The distinct peaks represent the most mathematically probable lifetimes residing within the sample. 
     
-    The bottom plot confirms the validity of this continuous approach. By multiplying the probability spectrum back through the kernel, we fully reconstruct the decay curve. Looking at the residuals we can verify that this reconstructed curve perfectly fits the original data while remaining purely governed by entropy regularization instead of discrete initial guesses.
+    The bottom plot confirms the validity of this continuous approach. By multiplying the probability spectrum back through the kernel we fully reconstruct the decay curve. Looking at the residuals we can verify that this reconstructed curve perfectly fits the original data while remaining purely governed by entropy regularization instead of discrete initial guesses.
     """)
