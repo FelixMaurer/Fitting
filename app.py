@@ -604,29 +604,29 @@ The MELT algorithm takes a completely different approach. It formulates the prob
 
 st.latex(r"y(t) = \int_{0}^{\infty} \alpha(\tau) K(t, \tau) d\tau + B")
 
-st.write("""
+st.write(r"""
 In this equation the variable alpha represents the continuous probability distribution of the lifetimes. The letter K represents the kernel, which is our familiar exponential decay convolved with the Gaussian instrument resolution function.
 
 **From Continuous Integral to Discrete Grid**
-Computers cannot calculate true continuous integrals over infinity. To solve this problem we must discretize the mathematics. We chop the continuous spectrum of possible lifetimes into a finite grid of distinct points. Let us call each specific lifetime point on this grid $\tau_i$. 
+Computers cannot calculate true continuous integrals over infinity. To solve this problem we must discretize the mathematics. We chop the continuous spectrum of possible lifetimes into a finite grid of distinct points. Let us call each specific lifetime point on this grid $ \tau_{i} $. 
 
-When we do this the continuous function $\alpha(\tau)$ transforms into a discrete list of numbers which we call $$\alpha_{i}$$. Each $$\alpha_{i}$$ simply represents the intensity or amplitude of that one specific lifetime $\tau_i$ on our grid. The continuous integral physically turns into a finite sum.
+When we do this the continuous function $\alpha(\tau)$ transforms into a discrete list of numbers which we call $ \alpha_{i} $. Each $ \alpha_{i} $ simply represents the intensity or amplitude of that one specific lifetime $ \tau_{i} $ on our grid. The continuous integral physically turns into a finite sum.
 """)
 
 
 
 st.latex(r"y(t) \approx \sum_{i=1}^{N} \alpha_i K(t, \tau_i) \Delta\tau + B")
 
-st.write("""
+st.write(r"""
 Now the entropy expression makes perfect sense. In information theory the Shannon entropy of a discrete system is calculated by taking each probability, multiplying it by its own natural logarithm, and summing them all together. 
 
-By treating our discrete amplitudes $$\alpha_{i}$$ exactly like a probability distribution, we can calculate the entropy of our lifetime spectrum.
+By treating our discrete amplitudes $ \alpha_{i} $ exactly like a probability distribution, we can calculate the entropy of our lifetime spectrum.
 """)
 
 st.latex(r"S(\alpha) = - \sum_{i=1}^{N} \alpha_i \ln(\alpha_i)")
 
-st.write("""
-If the entire signal came from just one single lifetime, one $$\alpha_{i}$$ would be extremely large and all the rest would be zero. This is a state of very low entropy. If the signal was a perfectly flat smear across every possible lifetime on our grid, every $$\alpha_{i}$$ would be exactly equal. This is a state of maximum possible entropy.
+st.write(r"""
+If the entire signal came from just one single lifetime, one $ \alpha_{i} $ would be extremely large and all the rest would be zero. This is a state of very low entropy. If the signal was a perfectly flat smear across every possible lifetime on our grid, every $ \alpha_{i} $ would be exactly equal. This is a state of maximum possible entropy.
 
 **Balancing the Objective Function**
 To prevent the algorithm from wildly oscillating and fitting every single noise spike, MELT uses Maximum Entropy regularization. We define an objective function that balances the standard Chi Squared error against the Shannon entropy. Because optimization algorithms search for the lowest possible number, we drop the negative sign from the entropy formula to create a penalty term. 
