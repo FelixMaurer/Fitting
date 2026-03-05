@@ -292,21 +292,21 @@ def pals_fit_func(x, A1, t0, tau1, A2, tau2, B, A3, tau3):
     return comp1 + comp2 + comp3 + B
 
 st.subheader("Adjust Starting Parameters")
-st.write("A fitting algorithm needs a starting point. Adjust the default guesses below and run the fit.")
+st.write("A fitting algorithm needs a starting point. Adjust the coarse default guesses below and run the fit.")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    g_t0 = st.number_input("t0", value=13.47)
-    g_B = st.number_input("Background B", value=1.85)
+    g_t0 = st.number_input("t0", value=13.0)
+    g_B = st.number_input("Background B", value=2.0)
 with col2:
-    g_A1 = st.number_input("A1", value=24705.0)
-    g_tau1 = st.number_input("tau1", value=0.25)
+    g_A1 = st.number_input("A1", value=25000.0)
+    g_tau1 = st.number_input("tau1", value=0.3)
 with col3:
-    g_A2 = st.number_input("A2", value=1686.0)
-    g_tau2 = st.number_input("tau2", value=0.61)
+    g_A2 = st.number_input("A2", value=2000.0)
+    g_tau2 = st.number_input("tau2", value=1.0)
 with col4:
-    g_A3 = st.number_input("A3", value=345.0)
-    g_tau3 = st.number_input("tau3", value=1.68)
+    g_A3 = st.number_input("A3", value=500.0)
+    g_tau3 = st.number_input("tau3", value=2.0)
 
 initial_guess = [g_A1, g_t0, g_tau1, g_A2, g_tau2, g_B, g_A3, g_tau3]
 
