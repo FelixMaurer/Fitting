@@ -608,6 +608,40 @@ st.write("""
 The lambda parameter controls the strength of the entropy penalty. This entropy term acts like a physical constraint that strictly penalizes negative values and forces the solution to be as smooth as possible. It prevents the algorithm from overfitting the noise and forces it to return clean and localized peaks that represent the true physical decay channels.
 """)
 
+st.write("""
+Let us break down exactly how this balance works. 
+
+**Maximizing the Entropy**
+The concept comes from information theory. The Shannon entropy of a distribution measures its randomness or smoothness. The mathematical definition of entropy contains a negative sign:
+""")
+
+st.latex(r"S(\alpha) = - \sum_{i} \alpha_i \ln(\alpha_i)")
+
+st.write("""
+A perfectly flat and uniform distribution has the maximum possible entropy. A sharp and isolated spike has very low entropy. 
+
+In our objective function we add the positive version of this term. Because optimization algorithms are designed to search for the lowest possible number, minimizing this positive term is mathematically identical to maximizing the actual entropy. 
+
+By pushing the entropy to its maximum, the algorithm constantly tries to smear the amplitudes out into a completely flat line. It strictly penalizes sharp spikes. The only way a peak is allowed to form is if the data absolutely demands it. The Chi Squared term forces the peaks to grow to fit the measured curve, while the entropy term pushes them down to prevent overfitting the statistical noise. 
+""")
+
+
+
+st.write("""
+**The SLSQP Solver Scheme**
+To navigate this delicate balance we use an algorithm called Sequential Least Squares Programming. 
+
+This solver is specifically chosen because it handles strict boundaries effortlessly. In physics we know that an amplitude cannot be negative. Standard solvers might wander into negative territory during their search and crash the exponential math. 
+
+Instead of looking at the entire complex landscape at once, this algorithm builds a localized quadratic bowl around its current position. It evaluates the slope of the Chi Squared curve and the slope of the entropy penalty, and then it calculates the fastest step to the bottom of this temporary bowl. 
+""")
+
+
+
+st.write("""
+If that step tries to cross the zero amplitude boundary, the algorithm simply hits the wall and slides along the edge. It repeats this process of building temporary bowls and stepping downward until the changes become so microscopic that it declares convergence. This guarantees a smooth and physically possible lifetime spectrum.
+""")
+
 if st.button("Run MELT Estimation"):
     st.write("Constructing continuous lifetime spectrum...")
     
