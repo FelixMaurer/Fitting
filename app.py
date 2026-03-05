@@ -427,7 +427,7 @@ Click the button below to see what happens when the algorithm tries to optimize 
 if st.button("Run Trapped Fit"):
     # The bad starting guess provided by the user
     # Order: [A1, t0, tau1, A2, tau2, B, A3, tau3]
-    bad_guess = [500.0, 13.0, 1.0, 2000.0, 0.1, 2.0, 100.0, 0.01]
+    bad_guess = [1000.0, 13.0, 1.0, 1000.0, 1, 2.0, 1.0, 0.01]
     
     weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
     lower_bounds = [0, 0, 0.01, 0, 0.01, 0, 0, 0.01]
