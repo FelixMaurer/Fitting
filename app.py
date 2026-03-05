@@ -443,7 +443,7 @@ if st.button("Run Trapped Fit"):
             absolute_sigma=True,
             bounds=(lower_bounds, upper_bounds),
             method='trf',
-            max_nfev=20000
+            max_nfev=50000
         )
         
         y_fit_bad = pals_fit_func(x_data, *popt_bad)
