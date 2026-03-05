@@ -214,8 +214,10 @@ if st.button("Run 2D Fit Animation"):
 st.markdown("### Understanding Local vs. Global Minima")
 st.write("""
 In the animation above, you are watching two separate fits happening at the same time. 
-* The **Green Path** starts in a lucky spot and rolls smoothly down into the deepest part of the valley. This is the **Global Minimum**, where the theoretical model perfectly matches the experimental data.
-* The **Red Path** (which you control) might get stuck in a shallower crater along the way. Because fitting algorithms are "blind" and only feel the slope directly under their feet, once they hit the bottom of *any* valley, they think they are done. This trap is called a **Local Minimum**.
+
+The **Green Path** starts in a lucky spot and rolls smoothly down into the deepest part of the valley. This is the **Global Minimum** where the theoretical model perfectly matches the experimental data.
+
+The **Red Path** controlled by your sliders might get stuck in a shallower crater along the way. Because fitting algorithms are blind and only feel the slope directly under their feet, they think they are done once they hit the bottom of any valley. This trap is called a **Local Minimum**.
 """)
 
 
@@ -224,5 +226,5 @@ st.markdown("### Why We Simplify Parameters")
 st.write("""
 When fitting complex physical systems, letting every parameter float freely creates incredibly rugged error landscapes filled with these local minimum traps. 
 
-This is exactly why it is often more robust to optimize for the **ratio** between parameters (such as $M_0/M_2$) rather than treating them as separate, independent variables. By locking in a ratio and ensuring that only a single physical driver—like the repulsion force—is allowed to change, you effectively slice through this chaotic 3D landscape. You collapse a tricky, crater-filled map into a simpler, smoother curve, forcing the algorithm to bypass the traps and land exactly on the true global minimum.
+This is exactly why it is often more robust to constrain parameters mathematically rather than treating them as entirely independent variables. By locking in specific relationships and ensuring that only a single physical driver is allowed to change, you effectively slice through this chaotic 3D landscape. You collapse a tricky and cratered map into a simpler and smoother curve. This forces the algorithm to bypass the traps and land exactly on the true global minimum.
 """)
