@@ -5,8 +5,15 @@ import time
 
 # --- SECTION 1: WHAT IS FITTING? ---
 st.header("1. What is Fitting?")
-st.write("Fitting is essentially an algorithm trying to find the 'bottom of a valley'. "
-         "Click the button below to watch how the line searches for the best slope by minimizing the errors (residues).")
+
+# The new explanation paragraph
+st.write("""
+Why do we use fitting? It generally serves two essential purposes:
+1. **Data Reduction:** It allows us to break down a large amount of correlating data into as few parameters as necessary, providing a clean, empirical summary of a system's behavior.
+2. **Theoretical Modeling:** It acts as a bridge between observation and theory. By fitting data to a specific model, we can test underlying physical explanations and extract meaningful parameters for further theoretical investigation. For example, a careful fit can reveal that the fundamental physics of a system relies strictly on the ratio between parameters like M0 and M2 rather than their individual values, or it can help us isolate how changing a single physical force, such as repulsion, drives the entire observed system.
+""")
+
+st.write("Click the button below to watch a simplified simulation of an algorithm searching for the best parameter by minimizing the errors (residues).")
 
 # 1. Setup Data
 true_slope = 2.2
@@ -28,7 +35,6 @@ path = best_slope - (best_slope - start_point) * damp * oscillation
 
 # 4. Animation Trigger
 if st.button("Run Fit Animation"):
-    # Create an empty container to hold the frames
     plot_placeholder = st.empty() 
     
     # 5. Animation Loop
@@ -55,14 +61,14 @@ if st.button("Run Fit Animation"):
         ax1.scatter(x, y, s=60, color='#3399CC', label='Data')
         ax1.plot(x, current_y, 'r', linewidth=2.5, label='Fitted Line')
         
-        # Plot residual lines (vertical lines from data to fit)
+        # Plot residual lines
         ax1.vlines(x, ymin=np.minimum(y, current_y), ymax=np.maximum(y, current_y), 
                    colors='#CC3333', linewidth=1, alpha=0.5)
         
         ax1.set_title('Visualizing the Fit')
         ax1.set_xlim(0, 11)
         ax1.set_ylim(min(y)-5, max(y)+5)
-        ax1.grid(True)
+        # Grid removed here
         
         # Right Subplot: The Error Ball
         ax2.plot(slopes_to_test, sse_curve, 'k', linewidth=1.5)
@@ -72,13 +78,9 @@ if st.button("Run Fit Animation"):
         ax2.set_title('Total Residue (The "Valley")')
         ax2.set_xlabel('Slope Parameter (m)')
         ax2.set_ylabel('Sum of Squared Residues')
-        ax2.grid(True)
+        # Grid removed here
         
-        # Overwrite the placeholder with the new frame
+        # Render and close
         plot_placeholder.pyplot(fig)
-        
-        # Close the figure to prevent memory leaks in the web app
         plt.close(fig) 
-        
-        # Pause to control animation speed
         time.sleep(0.08)
