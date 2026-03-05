@@ -292,7 +292,9 @@ def pals_fit_func(x, A1, t0, tau1, A2, tau2, B, A3, tau3):
     return comp1 + comp2 + comp3 + B
 
 st.subheader("Adjust Starting Parameters")
-st.write("A fitting algorithm needs a starting point. Adjust the coarse default guesses below and run the fit.")
+st.write("A fitting algorithm needs a starting point. The coarse default values provided below are positioned well enough to ensure the algorithm successfully converges to the true global minimum.")
+
+st.write("**The Challenge:** As we saw in the previous section, a complex landscape is full of traps. I challenge you to experiment with these inputs before moving on. Can you find a combination of starting values that traps the algorithm in a false local minimum where the final fit clearly misses the data, or causes it to fail completely?")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -307,6 +309,8 @@ with col3:
 with col4:
     g_A3 = st.number_input("A3", value=500.0)
     g_tau3 = st.number_input("tau3", value=2.0)
+
+initial_guess = [g_A1, g_t0, g_tau1, g_A2, g_tau2, g_B, g_A3, g_tau3]
 
 initial_guess = [g_A1, g_t0, g_tau1, g_A2, g_tau2, g_B, g_A3, g_tau3]
 
@@ -328,13 +332,13 @@ if st.button("Perform Lifetime Fit"):
             p0=initial_guess, 
             sigma=weights, 
             absolute_sigma=True,
-            bounds=(lower_bounds, upper_bounds), # Apply the physical limits
-            method='trf',                        # Use the bounded solver
-            max_nfev=10000                       # Give it more room to search
+            bounds=(lower_bounds, upper_bounds), 
+            method='trf',                        
+            max_nfev=10000                       
         )
         
         y_fit = pals_fit_func(x_data, *popt)
-        residuals = (y_data - y_fit) * weights # Weighted residuals
+        residuals = (y_data - y_fit) * weights 
         
         # Plotting
         fig, (ax_fit, ax_res) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'height_ratios': [3, 1]})
@@ -357,13 +361,38 @@ if st.button("Perform Lifetime Fit"):
         
         st.pyplot(fig)
         
-        # Parameter Output
-        st.success("Fit converged successfully.")
+        st.success("Fit converged successfully. See the final parameters below.")
         
-        col_res1, col_res2, col_res3 = st.columns(3)
-        col_res1.metric("tau 1", f"{popt[2]:.4f} ns")
-        col_res2.metric("tau 2", f"{popt[4]:.4f} ns")
-        col_res3.metric("tau 3", f"{popt[7]:.4f} ns")
+        # Calculate Errors and Intensities
+        perr = np.sqrt(np.diag(pcov))
+        I_tot = popt[0] + popt[3] + popt[6]
+        I1 = (popt[0] / I_tot) * 100
+        I2 = (popt[3] / I_tot) * 100
+        I3 = (popt[6] / I_tot) * 100
+
+        # Construct Results Table
+        results_data = {
+            "Parameter": [
+                "Amplitude A1", "Intensity I1 (%)", "Tau 1 (ns)",
+                "Amplitude A2", "Intensity I2 (%)", "Tau 2 (ns)",
+                "Amplitude A3", "Intensity I3 (%)", "Tau 3 (ns)",
+                "Offset t0 (ns)", "Background B"
+            ],
+            "Estimate": [
+                f"{popt[0]:.2f}", f"{I1:.2f}", f"{popt[2]:.4f}",
+                f"{popt[3]:.2f}", f"{I2:.2f}", f"{popt[4]:.4f}",
+                f"{popt[6]:.2f}", f"{I3:.2f}", f"{popt[7]:.4f}",
+                f"{popt[1]:.4f}", f"{popt[5]:.2f}"
+            ],
+            "Std. Error (±)": [
+                f"{perr[0]:.2f}", "", f"{perr[2]:.4f}",
+                f"{perr[3]:.2f}", "", f"{perr[4]:.4f}",
+                f"{perr[6]:.2f}", "", f"{perr[7]:.4f}",
+                f"{perr[1]:.4f}", f"{perr[5]:.2f}"
+            ]
+        }
+        
+        st.table(results_data)
 
     except Exception as e:
         st.error(f"Fit failed to converge. Try adjusting the starting parameters. Error: {e}")
