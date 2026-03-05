@@ -585,23 +585,33 @@ st.divider()
 st.header("6. The MELT Method: Flooding the Energy Landscape")
 
 st.write("""
-In the previous sections, we visualized the fitting process as dropping a single marble into a complex valley. The marble rolls downhill and often gets stuck in a local minimum. We can think of this residual valley as a vast energy landscape. Standard algorithms struggle because they only explore one single path at a time.
+In the previous sections we visualized the fitting process as dropping a single marble into a complex valley. The marble rolls downhill and often gets stuck in a local minimum. Standard algorithms struggle because they only explore one single path at a time and require a fixed number of discrete lifetimes.
 
-The MELT method takes a completely different approach. Instead of guessing a few discrete lifetimes and hoping they land in the right craters, MELT evaluates a continuous spectrum of lifetimes all at once. 
+The MELT algorithm takes a completely different approach. It formulates the problem as a continuous integral. Instead of guessing a few specific lifetimes, we assume the measured data is a continuous sum of all possible lifetimes weighted by their probability amplitude.
+""")
 
-Imagine flooding the entire energy landscape with water. The water naturally fills all the valleys simultaneously. By observing where the water pools, we can identify all the minima at the exact same time. The deepest pools correspond to the most probable lifetimes existing in our data.
+st.latex(r"y(t) = \int_{0}^{\infty} \alpha(\tau) K(t, \tau) d\tau + B")
+
+st.write("""
+In this equation the variable alpha represents the continuous probability distribution of the lifetimes. The letter K represents the kernel, which is our familiar exponential decay convolved with the Gaussian instrument resolution function.
+
+To solve this we discretize the integral into a fine grid of many possible lifetimes. However, trying to fit fifty lifetimes to our data creates an ill posed inverse problem. An unconstrained algorithm would wildly oscillate trying to fit every single noise spike perfectly. 
+
+To prevent this MELT uses Maximum Entropy regularization. We define an objective function that balances the standard Chi Squared error against the Shannon entropy of the distribution.
 """)
 
 
 
+st.latex(r"\Phi(\alpha) = \chi^2(\alpha) + \lambda \sum \alpha_i \ln(\alpha_i)")
+
 st.write("""
-Mathematically, MELT achieves this by setting up a grid of dozens of possible lifetimes. It then uses an optimization technique that balances minimizing the statistical errors against maximizing the entropy of the system. This entropy term acts like a physical constraint that prevents the water from splashing everywhere, forcing the algorithm to return smooth and localized peaks representing the true physical decay channels.
+The lambda parameter controls the strength of the entropy penalty. This entropy term acts like a physical constraint that strictly penalizes negative values and forces the solution to be as smooth as possible. It prevents the algorithm from overfitting the noise and forces it to return clean and localized peaks that represent the true physical decay channels.
 """)
 
 if st.button("Run MELT Estimation"):
     st.write("Constructing continuous lifetime spectrum...")
     
-    # 1. Prepare the Grid and Kernel to exactly match MATLAB
+    # 1. Prepare the Grid and Kernel
     fitted_offset = 13.47 
     fitted_B = 1.85
     weights = 1.0 / np.maximum(y_data, 1)
@@ -615,19 +625,17 @@ if st.button("Run MELT Estimation"):
         tau = tau_grid[j]
         K[:, j] = np.exp(-(x_data - fitted_offset)/tau) * erfc(1/np.sqrt(2) * (DeltaT/tau - (x_data - fitted_offset)/DeltaT))
         
-    # 2. Optimization (Chi Squared + Entropy)
+    # 2. Optimization
     lambda_reg = 0.001 
     def melt_objective(alpha):
         y_pred = K @ alpha + fitted_B
         chi_sq = np.sum(weights * (y_data - y_pred)**2)
-        # Entropy regularization term
         entropy = lambda_reg * np.sum(alpha * np.log(alpha + 1e-12))
         return chi_sq + entropy
 
     alpha_guess = np.ones(n_taus) * (np.max(y_data) / n_taus)
     bounds = [(0, None) for _ in range(n_taus)]
     
-    # Switch to SLSQP to match the MATLAB sqp algorithm
     res = minimize(
         melt_objective, 
         alpha_guess, 
@@ -637,16 +645,13 @@ if st.button("Run MELT Estimation"):
     )
     alpha_dist = res.x
     
-    # 3. Peak Finding (Extracting the top 3 peaks like MATLAB)
+    # 3. Peak Finding
     peaks, _ = find_peaks(alpha_dist)
     
     if len(peaks) > 0:
         peak_amps = alpha_dist[peaks]
-        # Sort by amplitude descending
         sorted_indices = np.argsort(peak_amps)[::-1]
-        # Take the top 3
         top_peaks = peaks[sorted_indices[:min(3, len(peaks))]]
-        # Sort back by tau (time) from left to right
         top_peaks = np.sort(top_peaks)
         
         peak_taus = tau_grid[top_peaks]
@@ -655,29 +660,51 @@ if st.button("Run MELT Estimation"):
         peak_taus = []
         peak_amps_display = []
     
-    # 4. Visualization
+    # --- FIGURE 1: THE MELT SPECTRUM ---
     fig_melt, ax_melt = plt.subplots(figsize=(10, 5))
-    ax_melt.semilogx(tau_grid, alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
     
-    # Mark the peaks
+    # We clip the lower bound of alpha slightly above zero to safely use log scale on the Y axis
+    safe_alpha_dist = np.maximum(alpha_dist, 1e-8)
+    ax_melt.loglog(tau_grid, safe_alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
+    
     for p_tau, p_amp in zip(peak_taus, peak_amps_display):
-        ax_melt.semilogx(p_tau, p_amp, 'ro', markersize=8)
-        ax_melt.text(p_tau, p_amp * 1.1, f"{p_tau:.3f} ns", ha='center', fontweight='bold', color='red')
+        safe_p_amp = max(p_amp, 1e-8)
+        ax_melt.loglog(p_tau, safe_p_amp, 'ro', markersize=8)
+        ax_melt.text(p_tau, safe_p_amp * 1.5, f"{p_tau:.3f} ns", ha='center', fontweight='bold', color='red')
         
     ax_melt.set_xlabel("Lifetime tau (ns)")
-    ax_melt.set_ylabel("Amplitude alpha(tau)")
+    ax_melt.set_ylabel("Amplitude alpha (log scale)")
     ax_melt.set_title("Continuous Lifetime Spectrum (MELT)")
     ax_melt.grid(True, which="both", linestyle=":", alpha=0.5)
     ax_melt.legend()
     
     st.pyplot(fig_melt)
+    st.success("MELT successfully mapped the continuous probability distribution.")
 
-    
+    # --- FIGURE 2: THE RECONSTRUCTED PREDICTION AND RESIDUALS ---
+    y_melt_predict = K @ alpha_dist + fitted_B
+    residuals_melt = (y_data - y_melt_predict) * np.sqrt(weights)
 
-    st.success("MELT successfully mapped the energy landscape.")
-    
+    fig_pred, (ax_fit_m, ax_res_m) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'height_ratios': [3, 1]})
+
+    ax_fit_m.semilogy(x_data, y_data, 'k.', markersize=2, label="Data")
+    ax_fit_m.semilogy(x_data, y_melt_predict, 'b-', linewidth=2, label="MELT Prediction")
+    ax_fit_m.set_ylabel("Counts (log scale)")
+    ax_fit_m.set_title("Reconstructed Decay Curve from MELT Spectrum")
+    ax_fit_m.legend()
+
+    ax_res_m.plot(x_data, residuals_melt, color='gray', linewidth=0.5)
+    ax_res_m.axhline(0, color='red', linewidth=1)
+    ax_res_m.axhline(2, color='red', linestyle=':')
+    ax_res_m.axhline(-2, color='red', linestyle=':')
+    ax_res_m.set_xlabel("Time (ns)")
+    ax_res_m.set_ylabel("Weighted Residuals")
+    ax_res_m.set_ylim(-5, 5)
+
+    st.pyplot(fig_pred)
+
     st.write("""
-    The plot above shows the resulting probability distribution. Every peak represents a distinct lifetime component found directly from the data without requiring a rigid initial guess. 
+    The top plot shows the continuous probability spectrum mapped onto a logarithmic grid. The distinct peaks represent the most mathematically probable lifetimes residing within the sample. 
     
-    By simply reading the positions of these peaks on the horizontal axis, we instantly obtain highly accurate estimates for our lifetimes. These values can either serve as the perfect starting point for our standard fitting algorithms or be used directly for theoretical analysis.
+    The bottom plot confirms the validity of this continuous approach. By multiplying the probability spectrum back through the kernel, we fully reconstruct the decay curve. Looking at the residuals we can verify that this reconstructed curve perfectly fits the original data while remaining purely governed by entropy regularization instead of discrete initial guesses.
     """)
