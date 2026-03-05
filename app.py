@@ -430,8 +430,8 @@ if st.button("Run Trapped Fit"):
     bad_guess = [25000.0, 13.0, 0.25, 2000.0, 1, 0.8, 1.0, 0.01]
     
     weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
-    lower_bounds = [0, 0, 0.01, 0, 0.01, 0, 0, 0.01]
-    upper_bounds = [np.inf, 50.0, 5.0, np.inf, 10.0, np.inf, np.inf, 50.0]
+    lower_bounds = [-np.inf,-np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf]
+    upper_bounds = [np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]
     
     try:
         popt_bad, pcov_bad = curve_fit(
