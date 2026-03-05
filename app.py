@@ -425,15 +425,14 @@ Click the button below to see what happens when the algorithm tries to optimize 
 """)
 
 if st.button("Run Trapped Fit"):
-    # The bad starting guess provided by the user
+    # The new bad starting guess provided by the user
     # Order: [A1, t0, tau1, A2, tau2, B, A3, tau3]
-    bad_guess = [25000.0, 13.47, 0.3, 5000.0, 1.5, 1.85, 1.0, 0.01]
+    bad_guess = [25000.0, 13.0, 0.25, 2000.0, 1.5, 2.0, 1.0, 0.01]
     
     weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
-    lower_bounds = [-np.inf,-np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf, -np.inf]
-    upper_bounds = [np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]
     
     try:
+        # We remove the bounds and switch to the Levenberg Marquardt method ('lm')
         popt_bad, pcov_bad = curve_fit(
             pals_fit_func, 
             x_data, 
@@ -441,9 +440,8 @@ if st.button("Run Trapped Fit"):
             p0=bad_guess, 
             sigma=weights, 
             absolute_sigma=True,
-            bounds=(lower_bounds, upper_bounds),
-            method='trf',
-            max_nfev=50000
+            method='lm', 
+            maxfev=10000
         )
         
         y_fit_bad = pals_fit_func(x_data, *popt_bad)
@@ -467,7 +465,16 @@ if st.button("Run Trapped Fit"):
         ax_res_bad.set_ylim(-15, 15) 
         
         st.pyplot(fig_bad)
-        st.error("The algorithm stopped, but the physics is wrong.")
+        
+        st.error("The algorithm converged, but it is trapped in a false minimum.")
+        
+        # Display the trapped parameters to match the MATLAB output
+        perr_bad = np.sqrt(np.diag(pcov_bad))
+        
+        col_trap1, col_trap2, col_trap3 = st.columns(3)
+        col_trap1.metric("tau 1", f"{popt_bad[2]:.4f} ns", f"Error: {perr_bad[2]:.4f}")
+        col_trap2.metric("tau 2", f"{popt_bad[4]:.4f} ns", f"Error: {perr_bad[4]:.4f}")
+        col_trap3.metric("tau 3", f"{popt_bad[7]:.4f} ns", f"Error: {perr_bad[7]:.4f}")
 
     except Exception as e:
         st.error(f"Fit failed completely. Error: {e}")
