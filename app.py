@@ -601,14 +601,12 @@ Mathematically, MELT achieves this by setting up a grid of dozens of possible li
 if st.button("Run MELT Estimation"):
     st.write("Constructing continuous lifetime spectrum...")
     
-    # 1. Prepare the Grid and Kernel
-    # We use fixed pre-fit values for t0 and Background to isolate the lifetime spectrum
+    # 1. Prepare the Grid and Kernel to exactly match MATLAB
     fitted_offset = 13.47 
     fitted_B = 1.85
-    true_sigma = np.sqrt(np.maximum(y_data, 1))
-    weights = 1.0 / true_sigma**2
+    weights = 1.0 / np.maximum(y_data, 1)
     
-    n_taus = 50
+    n_taus = 50 
     tau_grid = np.logspace(np.log10(0.01), np.log10(5.0), n_taus)
     K = np.zeros((len(x_data), n_taus))
     
@@ -617,38 +615,59 @@ if st.button("Run MELT Estimation"):
         tau = tau_grid[j]
         K[:, j] = np.exp(-(x_data - fitted_offset)/tau) * erfc(1/np.sqrt(2) * (DeltaT/tau - (x_data - fitted_offset)/DeltaT))
         
-    # 2. Optimization (Chi-Squared + Entropy)
+    # 2. Optimization (Chi Squared + Entropy)
+    lambda_reg = 0.001 
     def melt_objective(alpha):
         y_pred = K @ alpha + fitted_B
-        chi_squared = np.sum(weights * (y_data - y_pred)**2)
+        chi_sq = np.sum(weights * (y_data - y_pred)**2)
         # Entropy regularization term
-        entropy = 0.001 * np.sum(alpha * np.log(alpha + 1e-12))
-        return chi_squared + entropy
+        entropy = lambda_reg * np.sum(alpha * np.log(alpha + 1e-12))
+        return chi_sq + entropy
 
     alpha_guess = np.ones(n_taus) * (np.max(y_data) / n_taus)
     bounds = [(0, None) for _ in range(n_taus)]
     
-    res = minimize(melt_objective, alpha_guess, method='L-BFGS-B', bounds=bounds, options={'maxiter': 1000})
+    # Switch to SLSQP to match the MATLAB sqp algorithm
+    res = minimize(
+        melt_objective, 
+        alpha_guess, 
+        method='SLSQP', 
+        bounds=bounds, 
+        options={'maxiter': 50000, 'ftol': 1e-6}
+    )
     alpha_dist = res.x
     
-    # 3. Peak Finding
+    # 3. Peak Finding (Extracting the top 3 peaks like MATLAB)
     peaks, _ = find_peaks(alpha_dist)
-    peak_taus = tau_grid[peaks]
-    peak_amps = alpha_dist[peaks]
+    
+    if len(peaks) > 0:
+        peak_amps = alpha_dist[peaks]
+        # Sort by amplitude descending
+        sorted_indices = np.argsort(peak_amps)[::-1]
+        # Take the top 3
+        top_peaks = peaks[sorted_indices[:min(3, len(peaks))]]
+        # Sort back by tau (time) from left to right
+        top_peaks = np.sort(top_peaks)
+        
+        peak_taus = tau_grid[top_peaks]
+        peak_amps_display = alpha_dist[top_peaks]
+    else:
+        peak_taus = []
+        peak_amps_display = []
     
     # 4. Visualization
     fig_melt, ax_melt = plt.subplots(figsize=(10, 5))
-    ax_melt.semilogx(tau_grid, alpha_dist, 'b-', linewidth=2, label="MELT Spectrum")
+    ax_melt.semilogx(tau_grid, alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
     
     # Mark the peaks
-    for p_tau, p_amp in zip(peak_taus, peak_amps):
+    for p_tau, p_amp in zip(peak_taus, peak_amps_display):
         ax_melt.semilogx(p_tau, p_amp, 'ro', markersize=8)
-        ax_melt.text(p_tau, p_amp * 1.05, f"{p_tau:.2f} ns", ha='center', fontweight='bold', color='red')
+        ax_melt.text(p_tau, p_amp * 1.1, f"{p_tau:.3f} ns", ha='center', fontweight='bold', color='red')
         
     ax_melt.set_xlabel("Lifetime tau (ns)")
     ax_melt.set_ylabel("Amplitude alpha(tau)")
     ax_melt.set_title("Continuous Lifetime Spectrum (MELT)")
-    ax_melt.grid(True, which="both", ls="--", alpha=0.5)
+    ax_melt.grid(True, which="both", linestyle=":", alpha=0.5)
     ax_melt.legend()
     
     st.pyplot(fig_melt)
