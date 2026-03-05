@@ -577,3 +577,88 @@ if st.button("Calculate Autocorrelation for Both Fits"):
     
     The plot on the right represents the trapped fit. The strong wave pattern violently breaches the confidence limits for dozens of bins. The math proves what our eyes suspected: the model is fundamentally incorrect.
     """)
+# --- SECTION 6: THE MELT METHOD ---
+from scipy.signal import find_peaks
+from scipy.optimize import minimize
+
+st.divider()
+st.header("6. The MELT Method: Flooding the Energy Landscape")
+
+st.write("""
+In the previous sections, we visualized the fitting process as dropping a single marble into a complex valley. The marble rolls downhill and often gets stuck in a local minimum. We can think of this residual valley as a vast energy landscape. Standard algorithms struggle because they only explore one single path at a time.
+
+The MELT method takes a completely different approach. Instead of guessing a few discrete lifetimes and hoping they land in the right craters, MELT evaluates a continuous spectrum of lifetimes all at once. 
+
+Imagine flooding the entire energy landscape with water. The water naturally fills all the valleys simultaneously. By observing where the water pools, we can identify all the minima at the exact same time. The deepest pools correspond to the most probable lifetimes existing in our data.
+""")
+
+
+
+st.write("""
+Mathematically, MELT achieves this by setting up a grid of dozens of possible lifetimes. It then uses an optimization technique that balances minimizing the statistical errors against maximizing the entropy of the system. This entropy term acts like a physical constraint that prevents the water from splashing everywhere, forcing the algorithm to return smooth and localized peaks representing the true physical decay channels.
+""")
+
+if st.button("Run MELT Estimation"):
+    st.write("Constructing continuous lifetime spectrum...")
+    
+    # 1. Prepare the Grid and Kernel
+    # We use fixed pre-fit values for t0 and Background to isolate the lifetime spectrum
+    fitted_offset = 13.47 
+    fitted_B = 1.85
+    true_sigma = np.sqrt(np.maximum(y_data, 1))
+    weights = 1.0 / true_sigma**2
+    
+    n_taus = 40
+    tau_grid = np.logspace(np.log10(0.01), np.log10(5.0), n_taus)
+    K = np.zeros((len(x_data), n_taus))
+    
+    DeltaT = 0.297 / 2.35
+    for j in range(n_taus):
+        tau = tau_grid[j]
+        K[:, j] = np.exp(-(x_data - fitted_offset)/tau) * erfc(1/np.sqrt(2) * (DeltaT/tau - (x_data - fitted_offset)/DeltaT))
+        
+    # 2. Optimization (Chi-Squared + Entropy)
+    def melt_objective(alpha):
+        y_pred = K @ alpha + fitted_B
+        chi_squared = np.sum(weights * (y_data - y_pred)**2)
+        # Entropy regularization term
+        entropy = 0.001 * np.sum(alpha * np.log(alpha + 1e-12))
+        return chi_squared + entropy
+
+    alpha_guess = np.ones(n_taus) * (np.max(y_data) / n_taus)
+    bounds = [(0, None) for _ in range(n_taus)]
+    
+    res = minimize(melt_objective, alpha_guess, method='L-BFGS-B', bounds=bounds, options={'maxiter': 1000})
+    alpha_dist = res.x
+    
+    # 3. Peak Finding
+    peaks, _ = find_peaks(alpha_dist)
+    peak_taus = tau_grid[peaks]
+    peak_amps = alpha_dist[peaks]
+    
+    # 4. Visualization
+    fig_melt, ax_melt = plt.subplots(figsize=(10, 5))
+    ax_melt.semilogx(tau_grid, alpha_dist, 'b-', linewidth=2, label="MELT Spectrum")
+    
+    # Mark the peaks
+    for p_tau, p_amp in zip(peak_taus, peak_amps):
+        ax_melt.semilogx(p_tau, p_amp, 'ro', markersize=8)
+        ax_melt.text(p_tau, p_amp * 1.05, f"{p_tau:.2f} ns", ha='center', fontweight='bold', color='red')
+        
+    ax_melt.set_xlabel("Lifetime tau (ns)")
+    ax_melt.set_ylabel("Amplitude alpha(tau)")
+    ax_melt.set_title("Continuous Lifetime Spectrum (MELT)")
+    ax_melt.grid(True, which="both", ls="--", alpha=0.5)
+    ax_melt.legend()
+    
+    st.pyplot(fig_melt)
+
+    
+
+    st.success("MELT successfully mapped the energy landscape.")
+    
+    st.write("""
+    The plot above shows the resulting probability distribution. Every peak represents a distinct lifetime component found directly from the data without requiring a rigid initial guess. 
+    
+    By simply reading the positions of these peaks on the horizontal axis, we instantly obtain highly accurate estimates for our lifetimes. These values can either serve as the perfect starting point for our standard fitting algorithms or be used directly for theoretical analysis.
+    """)
