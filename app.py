@@ -608,7 +608,7 @@ if st.button("Run MELT Estimation"):
     true_sigma = np.sqrt(np.maximum(y_data, 1))
     weights = 1.0 / true_sigma**2
     
-    n_taus = 40
+    n_taus = 50
     tau_grid = np.logspace(np.log10(0.01), np.log10(5.0), n_taus)
     K = np.zeros((len(x_data), n_taus))
     
