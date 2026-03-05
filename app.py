@@ -617,7 +617,7 @@ if st.button("Run MELT Estimation"):
     weights = 1.0 / np.maximum(y_data, 1)
     
     n_taus = 50 
-    tau_grid = np.logspace(np.log10(0.01), np.log10(5.0), n_taus)
+    tau_grid = np.logspace(np.log10(0.05), np.log10(5.0), n_taus)
     K = np.zeros((len(x_data), n_taus))
     
     DeltaT = 0.297 / 2.35
@@ -669,7 +669,7 @@ if st.button("Run MELT Estimation"):
     
     for p_tau, p_amp in zip(peak_taus, peak_amps_display):
         safe_p_amp = max(p_amp, 1e-8)
-        ax_melt.loglog(p_tau, safe_p_amp, 'ro', markersize=8)
+        ax_melt.semilogx(p_tau, safe_p_amp, 'ro', markersize=8)
         ax_melt.text(p_tau, safe_p_amp * 1.5, f"{p_tau:.3f} ns", ha='center', fontweight='bold', color='red')
         
     ax_melt.set_xlabel("Lifetime tau (ns)")
