@@ -595,39 +595,38 @@ st.latex(r"y(t) = \int_{0}^{\infty} \alpha(\tau) K(t, \tau) d\tau + B")
 st.write("""
 In this equation the variable alpha represents the continuous probability distribution of the lifetimes. The letter K represents the kernel, which is our familiar exponential decay convolved with the Gaussian instrument resolution function.
 
-To solve this we discretize the integral into a fine grid of many possible lifetimes. However, trying to fit fifty lifetimes to our data creates an ill posed inverse problem. An unconstrained algorithm would wildly oscillate trying to fit every single noise spike perfectly. 
+**From Continuous Integral to Discrete Grid**
+Computers cannot calculate true continuous integrals over infinity. To solve this problem we must discretize the mathematics. We chop the continuous spectrum of possible lifetimes into a finite grid of distinct points. Let us call each specific lifetime point on this grid $\tau_i$. 
 
-To prevent this MELT uses Maximum Entropy regularization. We define an objective function that balances the standard Chi Squared error against the Shannon entropy of the distribution.
+When we do this the continuous function $\alpha(\tau)$ transforms into a discrete list of numbers which we call $\alpha_i$. Each $\alpha_i$ simply represents the intensity or amplitude of that one specific lifetime $\tau_i$ on our grid. The continuous integral physically turns into a finite sum.
 """)
 
 
 
-st.latex(r"\Phi(\alpha) = \chi^2(\alpha) + \lambda \sum \alpha_i \ln(\alpha_i)")
+st.latex(r"y(t) \approx \sum_{i=1}^{N} \alpha_i K(t, \tau_i) \Delta\tau + B")
 
 st.write("""
-The lambda parameter controls the strength of the entropy penalty. This entropy term acts like a physical constraint that strictly penalizes negative values and forces the solution to be as smooth as possible. It prevents the algorithm from overfitting the noise and forces it to return clean and localized peaks that represent the true physical decay channels.
+Now the entropy expression makes perfect sense. In information theory the Shannon entropy of a discrete system is calculated by taking each probability, multiplying it by its own natural logarithm, and summing them all together. 
+
+By treating our discrete amplitudes $\alpha_i$ exactly like a probability distribution, we can calculate the entropy of our lifetime spectrum.
 """)
 
-st.write("""
-Let us break down exactly how this balance works. 
+st.latex(r"S(\alpha) = - \sum_{i=1}^{N} \alpha_i \ln(\alpha_i)")
 
-**Maximizing the Entropy**
-The concept comes from information theory. The Shannon entropy of a distribution measures its randomness or smoothness. The mathematical definition of entropy contains a negative sign:
+st.write("""
+If the entire signal came from just one single lifetime, one $\alpha_i$ would be extremely large and all the rest would be zero. This is a state of very low entropy. If the signal was a perfectly flat smear across every possible lifetime on our grid, every $\alpha_i$ would be exactly equal. This is a state of maximum possible entropy.
+
+**Balancing the Objective Function**
+To prevent the algorithm from wildly oscillating and fitting every single noise spike, MELT uses Maximum Entropy regularization. We define an objective function that balances the standard Chi Squared error against the Shannon entropy. Because optimization algorithms search for the lowest possible number, we drop the negative sign from the entropy formula to create a penalty term. 
 """)
 
-st.latex(r"S(\alpha) = - \sum_{i} \alpha_i \ln(\alpha_i)")
+st.latex(r"\Phi(\alpha) = \chi^2(\alpha) + \lambda \sum_{i=1}^{N} \alpha_i \ln(\alpha_i)")
 
 st.write("""
-A perfectly flat and uniform distribution has the maximum possible entropy. A sharp and isolated spike has very low entropy. 
+The lambda parameter controls the strength of this entropy penalty. By pushing the entropy term to its maximum, the algorithm constantly tries to smear the amplitudes out into a completely flat line. It strictly penalizes sharp spikes. 
 
-In our objective function we add the positive version of this term. Because optimization algorithms are designed to search for the lowest possible number, minimizing this positive term is mathematically identical to maximizing the actual entropy. 
+The only way a peak is allowed to form is if the data absolutely demands it. The Chi Squared term forces the peaks to grow to fit the measured decay curve, while the entropy term pushes them down to prevent overfitting the statistical noise. This forces the algorithm to return clean and localized peaks that represent the true physical decay channels.
 
-By pushing the entropy to its maximum, the algorithm constantly tries to smear the amplitudes out into a completely flat line. It strictly penalizes sharp spikes. The only way a peak is allowed to form is if the data absolutely demands it. The Chi Squared term forces the peaks to grow to fit the measured curve, while the entropy term pushes them down to prevent overfitting the statistical noise. 
-""")
-
-
-
-st.write("""
 **The SLSQP Solver Scheme**
 To navigate this delicate balance we use an algorithm called Sequential Least Squares Programming. 
 
