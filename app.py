@@ -429,23 +429,27 @@ if st.button("Run Trapped Fit"):
     # Order: [A1, t0, tau1, A2, tau2, B, A3, tau3]
     bad_guess = [25000.0, 13.0, 0.25, 2000.0, 1.5, 2.0, 1.0, 0.01]
     
-    weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
+    # CORRECTED WEIGHTING: 
+    # curve_fit expects standard deviation (sigma), which is sqrt(N)
+    true_sigma = np.sqrt(np.maximum(y_data, 1))
     
     try:
-        # We remove the bounds and switch to the Levenberg Marquardt method ('lm')
+        # Use Levenberg Marquardt method to match MATLAB default
         popt_bad, pcov_bad = curve_fit(
             pals_fit_func, 
             x_data, 
             y_data, 
             p0=bad_guess, 
-            sigma=weights, 
+            sigma=true_sigma, 
             absolute_sigma=True,
             method='lm', 
             maxfev=10000
         )
         
         y_fit_bad = pals_fit_func(x_data, *popt_bad)
-        residuals_bad = (y_data - y_fit_bad) * weights
+        
+        # Weighted residuals are (Data - Fit) / Sigma
+        residuals_bad = (y_data - y_fit_bad) / true_sigma
         
         # Plotting the bad fit
         fig_bad, (ax_fit_bad, ax_res_bad) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'height_ratios': [3, 1]})
@@ -468,9 +472,13 @@ if st.button("Run Trapped Fit"):
         
         st.error("The algorithm converged, but it is trapped in a false minimum.")
         
-        # Display the trapped parameters to match the MATLAB output
-        perr_bad = np.sqrt(np.diag(pcov_bad))
+        # Check for infinity or NaN in the covariance matrix (which MATLAB outputs as 0.00 error)
+        if np.isinf(pcov_bad).any() or np.isnan(pcov_bad).any():
+            perr_bad = np.zeros_like(popt_bad)
+        else:
+            perr_bad = np.sqrt(np.diag(pcov_bad))
         
+        # Display the trapped parameters
         col_trap1, col_trap2, col_trap3 = st.columns(3)
         col_trap1.metric("tau 1", f"{popt_bad[2]:.4f} ns", f"Error: {perr_bad[2]:.4f}")
         col_trap2.metric("tau 2", f"{popt_bad[4]:.4f} ns", f"Error: {perr_bad[4]:.4f}")
