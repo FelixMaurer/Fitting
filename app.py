@@ -314,6 +314,12 @@ if st.button("Perform Lifetime Fit"):
     # Calculate Weights (1 / sqrt(N))
     weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
     
+    # Define bounds: [A1, t0, tau1, A2, tau2, B, A3, tau3]
+    # Lower bounds: everything must be strictly positive
+    lower_bounds = [0, 0, 0.01, 0, 0.01, 0, 0, 0.01]
+    # Upper bounds: set arbitrarily high for amplitudes, but reasonable for times
+    upper_bounds = [np.inf, 50.0, 5.0, np.inf, 10.0, np.inf, np.inf, 50.0]
+    
     try:
         popt, pcov = curve_fit(
             pals_fit_func, 
@@ -322,7 +328,9 @@ if st.button("Perform Lifetime Fit"):
             p0=initial_guess, 
             sigma=weights, 
             absolute_sigma=True,
-            maxfev=5000
+            bounds=(lower_bounds, upper_bounds), # Apply the physical limits
+            method='trf',                        # Use the bounded solver
+            max_nfev=10000                       # Give it more room to search
         )
         
         y_fit = pals_fit_func(x_data, *popt)
