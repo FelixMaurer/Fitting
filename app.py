@@ -228,3 +228,150 @@ When fitting complex physical systems, letting every parameter float freely crea
 
 This is exactly why it is often more robust to constrain parameters mathematically rather than treating them as entirely independent variables. By locking in specific relationships and ensuring that only a single physical driver is allowed to change, you effectively slice through this chaotic 3D landscape. You collapse a tricky and cratered map into a simpler and smoother curve. This forces the algorithm to bypass the traps and land exactly on the true global minimum.
 """)
+
+# --- SECTION 3: THE LIFETIME FIT ---
+import os
+from scipy.special import erfc
+from scipy.optimize import curve_fit
+
+st.markdown("***")
+st.header("3. The Straightforward Lifetime Fit")
+
+st.write("""
+Now we apply the fitting algorithm to a real physical scenario. In lifetime spectroscopy, we measure how long particles survive before they decay or annihilate. 
+
+The theoretical model is not a simple line. It is a sum of exponential decays. However, our detectors are not perfectly precise. They have a timing resolution that smears the data. Mathematically, this means we must convolve our exponential decay model with a Gaussian distribution representing the detector resolution.
+""")
+
+st.latex(r"F(t) = B + \sum_{i=1}^{3} A_i \exp\left(-\frac{t-t_0}{\tau_i}\right) \text{erfc}\left( \frac{1}{\sqrt{2}} \left( \frac{\sigma}{\tau_i} - \frac{t-t_0}{\sigma} \right) \right)")
+
+st.write("""
+In this equation:
+* **A** represents the amplitude or intensity of a specific decay channel.
+* **tau** represents the lifetime of that state.
+* **t0** is the exact time zero point when the particles arrive.
+* **sigma** is the detector resolution.
+* **B** is the constant background noise.
+* **erfc** is the complementary error function which handles the Gaussian smearing.
+""")
+
+# Load Data or generate dummy data if file is missing
+file_name = 'positronlifetime.txt'
+if os.path.exists(file_name):
+    data = np.loadtxt(file_name)
+    x_raw = data[:, 0]
+    y_raw = data[:, 1]
+    
+    # Safe indexing for ROI
+    i_start = 2300
+    i_end = len(x_raw) - 1200
+    x_data = x_raw[i_start:i_end]
+    y_data = y_raw[i_start:i_end]
+else:
+    st.warning("Data file not found. Using synthetic data for demonstration.")
+    x_data = np.linspace(10, 30, 1000)
+    sigma_demo = 0.297 / 2.35
+    def mock_model(x):
+        comp1 = 25000 * np.exp(-(x-13.5)/0.25) * erfc(1/np.sqrt(2) * (sigma_demo/0.25 - (x-13.5)/sigma_demo))
+        comp2 = 1700 * np.exp(-(x-13.5)/0.61) * erfc(1/np.sqrt(2) * (sigma_demo/0.61 - (x-13.5)/sigma_demo))
+        comp3 = 350 * np.exp(-(x-13.5)/1.68) * erfc(1/np.sqrt(2) * (sigma_demo/1.68 - (x-13.5)/sigma_demo))
+        return comp1 + comp2 + comp3 + 2.0
+    
+    y_true = mock_model(x_data)
+    # Add Poisson-like noise
+    y_data = np.random.poisson(np.maximum(y_true, 0))
+
+# The Fit Function
+def pals_fit_func(x, A1, t0, tau1, A2, tau2, B, A3, tau3):
+    DeltaT = 0.297 / 2.35 # sigma
+    
+    comp1 = A1 * np.exp(-(x-t0)/tau1) * erfc(1/np.sqrt(2) * (DeltaT/tau1 - (x-t0)/DeltaT))
+    comp2 = A2 * np.exp(-(x-t0)/tau2) * erfc(1/np.sqrt(2) * (DeltaT/tau2 - (x-t0)/DeltaT))
+    comp3 = A3 * np.exp(-(x-t0)/tau3) * erfc(1/np.sqrt(2) * (DeltaT/tau3 - (x-t0)/DeltaT))
+    
+    return comp1 + comp2 + comp3 + B
+
+st.subheader("Adjust Starting Parameters")
+st.write("A fitting algorithm needs a starting point. Adjust the default guesses below and run the fit.")
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    g_t0 = st.number_input("t0", value=13.47)
+    g_B = st.number_input("Background B", value=1.85)
+with col2:
+    g_A1 = st.number_input("A1", value=24705.0)
+    g_tau1 = st.number_input("tau1", value=0.25)
+with col3:
+    g_A2 = st.number_input("A2", value=1686.0)
+    g_tau2 = st.number_input("tau2", value=0.61)
+with col4:
+    g_A3 = st.number_input("A3", value=345.0)
+    g_tau3 = st.number_input("tau3", value=1.68)
+
+initial_guess = [g_A1, g_t0, g_tau1, g_A2, g_tau2, g_B, g_A3, g_tau3]
+
+if st.button("Perform Lifetime Fit"):
+    # Calculate Weights (1 / sqrt(N))
+    weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
+    
+    try:
+        popt, pcov = curve_fit(
+            pals_fit_func, 
+            x_data, 
+            y_data, 
+            p0=initial_guess, 
+            sigma=weights, 
+            absolute_sigma=True,
+            maxfev=5000
+        )
+        
+        y_fit = pals_fit_func(x_data, *popt)
+        residuals = (y_data - y_fit) * weights # Weighted residuals
+        
+        # Plotting
+        fig, (ax_fit, ax_res) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'height_ratios': [3, 1]})
+        
+        # Fit Plot
+        ax_fit.semilogy(x_data, y_data, 'k.', markersize=2, label="Data")
+        ax_fit.semilogy(x_data, y_fit, 'r-', linewidth=2, label="Final Fit")
+        ax_fit.set_ylabel("Counts (log scale)")
+        ax_fit.set_title("Lifetime Spectra and Final Fit")
+        ax_fit.legend()
+        
+        # Residual Plot
+        ax_res.plot(x_data, residuals, color='gray', linewidth=0.5)
+        ax_res.axhline(0, color='red', linewidth=1)
+        ax_res.axhline(2, color='red', linestyle=':')
+        ax_res.axhline(-2, color='red', linestyle=':')
+        ax_res.set_xlabel("Time (ns)")
+        ax_res.set_ylabel("Weighted Residuals")
+        ax_res.set_ylim(-5, 5)
+        
+        st.pyplot(fig)
+        
+        # Parameter Output
+        st.success("Fit converged successfully.")
+        
+        col_res1, col_res2, col_res3 = st.columns(3)
+        col_res1.metric("tau 1", f"{popt[2]:.4f} ns")
+        col_res2.metric("tau 2", f"{popt[4]:.4f} ns")
+        col_res3.metric("tau 3", f"{popt[7]:.4f} ns")
+
+    except Exception as e:
+        st.error(f"Fit failed to converge. Try adjusting the starting parameters. Error: {e}")
+
+# Explanation of Residuals
+st.markdown("### Reading the Residuals Plot")
+st.write("""
+The bottom panel in the plot above shows the weighted residuals. This is the absolute best tool to evaluate the quality of your fit. 
+
+When an algorithm minimizes the sum of squared errors, it assumes that any remaining mismatch between the data and the model is purely random statistical noise. 
+
+If your model perfectly describes the physics of the system, the residuals will look like TV static. They should be scattered entirely randomly around the zero line, mostly staying within the limits of plus 2 and minus 2. 
+""")
+
+
+
+st.write("""
+If you see clear wavy patterns, slopes, or large spikes in the residuals, it means the model is failing to capture a physical process. The algorithm might have successfully minimized the math, but the physics is still incomplete. You might need to add another lifetime component or adjust your detector resolution parameter.
+""")
