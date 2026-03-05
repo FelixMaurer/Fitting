@@ -412,3 +412,71 @@ If your model perfectly describes the physics of the system, the residuals will 
 st.write("""
 If you see clear wavy patterns, slopes, or large spikes in the residuals, it means the model is failing to capture a physical process. The algorithm might have successfully minimized the math, but the physics is still incomplete. You might need to add another lifetime component or adjust your detector resolution parameter.
 """)
+# --- SECTION 4: THE WRONG MINIMUM ---
+st.divider()
+st.header("4. Trapped in the Wrong Minimum")
+
+st.write("""
+Let us look at a concrete example of a fit gone wrong. 
+
+We will feed the algorithm a specific set of poor starting values where the amplitudes and lifetimes are severely mixed up. Component three is given an extremely short lifetime guess, and the main amplitude is severely underestimated. 
+
+Click the button below to see what happens when the algorithm tries to optimize from this bad starting location.
+""")
+
+if st.button("Run Trapped Fit"):
+    # The bad starting guess provided by the user
+    # Order: [A1, t0, tau1, A2, tau2, B, A3, tau3]
+    bad_guess = [500.0, 13.0, 1.0, 2000.0, 0.1, 2.0, 100.0, 0.01]
+    
+    weights = 1.0 / np.sqrt(np.maximum(y_data, 1))
+    lower_bounds = [0, 0, 0.01, 0, 0.01, 0, 0, 0.01]
+    upper_bounds = [np.inf, 50.0, 5.0, np.inf, 10.0, np.inf, np.inf, 50.0]
+    
+    try:
+        popt_bad, pcov_bad = curve_fit(
+            pals_fit_func, 
+            x_data, 
+            y_data, 
+            p0=bad_guess, 
+            sigma=weights, 
+            absolute_sigma=True,
+            bounds=(lower_bounds, upper_bounds),
+            method='trf',
+            max_nfev=10000
+        )
+        
+        y_fit_bad = pals_fit_func(x_data, *popt_bad)
+        residuals_bad = (y_data - y_fit_bad) * weights
+        
+        # Plotting the bad fit
+        fig_bad, (ax_fit_bad, ax_res_bad) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={'height_ratios': [3, 1]})
+        
+        ax_fit_bad.semilogy(x_data, y_data, 'k.', markersize=2, label="Data")
+        ax_fit_bad.semilogy(x_data, y_fit_bad, 'r-', linewidth=2, label="Trapped Fit")
+        ax_fit_bad.set_ylabel("Counts (log scale)")
+        ax_fit_bad.set_title("Lifetime Spectra with Local Minimum Fit")
+        ax_fit_bad.legend()
+        
+        ax_res_bad.plot(x_data, residuals_bad, color='gray', linewidth=0.5)
+        ax_res_bad.axhline(0, color='red', linewidth=1)
+        ax_res_bad.axhline(2, color='red', linestyle=':')
+        ax_res_bad.axhline(-2, color='red', linestyle=':')
+        ax_res_bad.set_xlabel("Time (ns)")
+        ax_res_bad.set_ylabel("Weighted Residues")
+        ax_res_bad.set_ylim(-15, 15) 
+        
+        st.pyplot(fig_bad)
+        st.error("The algorithm stopped, but the physics is wrong.")
+
+    except Exception as e:
+        st.error(f"Fit failed completely. Error: {e}")
+
+st.markdown("### Why this is a Bad Fit")
+st.write("""
+Look closely at the bottom panel showing the weighted residues. 
+
+In a good fit, these dots should look like static noise on an old television. They should scatter randomly around the zero line. 
+
+However, in the plot above, the residues form massive waves and obvious structures. They shoot far beyond the acceptable boundaries. This systematic deviation is the absolute clearest sign that the algorithm found a local crater rather than the true global minimum. It tells us that the mathematical model currently displayed does not reflect the actual physics of the measured data.
+""")
