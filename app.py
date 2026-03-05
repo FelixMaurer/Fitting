@@ -665,7 +665,7 @@ if st.button("Run MELT Estimation"):
     
     # We clip the lower bound of alpha slightly above zero to safely use log scale on the Y axis
     safe_alpha_dist = np.maximum(alpha_dist, 1e-8)
-    ax_melt.loglog(tau_grid, safe_alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
+    ax_melt.semilogx(tau_grid, safe_alpha_dist, 'b', linewidth=2, label="MELT Spectrum")
     
     for p_tau, p_amp in zip(peak_taus, peak_amps_display):
         safe_p_amp = max(p_amp, 1e-8)
